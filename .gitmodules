@@ -1,0 +1,6 @@
+[submodule "rt-thread"]
+	path = rt-thread
+	url = https://github.com/RT-Thread/rt-thread.git
+[submodule "hpm_sdk"]
+	path = hpm_sdk
+	url = https://github.com/hpmicro/hpm_sdk.git

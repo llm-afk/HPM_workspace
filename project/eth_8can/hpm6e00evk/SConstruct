@@ -1,0 +1,122 @@
+import os
+import sys
+import rtconfig
+
+if os.getenv('RTT_ROOT'):
+    RTT_ROOT = os.getenv('RTT_ROOT')
+else:
+    RTT_ROOT = os.path.normpath(os.getcwd() + '/../../../rt-thread')
+
+sys.path = sys.path + [os.path.join(RTT_ROOT, 'tools')]
+try:
+    from building import *
+except:
+    print('Cannot found RT-Thread root directory, please check RTT_ROOT')
+    print(RTT_ROOT)
+    exit(-1)
+
+TARGET = 'rtthread.' + rtconfig.TARGET_EXT
+
+AddOption('--run',
+        dest = 'run',
+        type='string',
+        nargs=1,
+        action = 'store',
+        default = "",
+        help = 'Upload or debug application using openocd')
+
+DefaultEnvironment(tools=[])
+env = Environment(tools = ['mingw'],
+    AS = rtconfig.AS, ASFLAGS = rtconfig.AFLAGS,
+    CC = rtconfig.CC, CCFLAGS = rtconfig.CFLAGS,
+    AR = rtconfig.AR, ARFLAGS = '-rc',
+    LINK = rtconfig.LINK, LINKFLAGS = rtconfig.LFLAGS,
+    CXXCOM = '$CXX -o $TARGET -c $CXXFLAGS $_CCCOMCOM $SOURCES')
+
+env.PrependENVPath('PATH', rtconfig.EXEC_PATH)
+env['ASCOM'] = env['ASPPCOM']
+
+Export('RTT_ROOT')
+Export('rtconfig')
+
+SDK_ROOT = os.path.abspath('./')
+libraries_path_prefix = os.path.join(os.path.dirname(os.path.dirname(SDK_ROOT)), 'hpm_libraries', 'libraries')
+
+SDK_LIB = libraries_path_prefix
+Export('SDK_LIB')
+
+
+GDB = rtconfig.GDB
+
+# prepare building environment
+objs = PrepareBuilding(env, RTT_ROOT, has_libcpu=False)
+
+
+
+# includes rtt drivers
+objs.extend(SConscript(os.path.join(libraries_path_prefix, 'drivers',  'SConscript')))
+
+# --- HPM SDK Includes ---
+HPM_SDK_BASE = rtconfig.HPM_SDK_BASE
+SDK_INC_PATHS = [
+    os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, 'inc'),
+    os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, 'ip'),
+    os.path.join(HPM_SDK_BASE, 'drivers', 'inc'),
+    os.path.join(HPM_SDK_BASE, 'components', 'pdm'),
+    os.path.join(HPM_SDK_BASE, 'components', 'debug_console'),
+    os.path.join(HPM_SDK_BASE, 'components', 'dma_mgr'),
+    os.path.join(HPM_SDK_BASE, 'utils'),
+    os.path.join(HPM_SDK_BASE, 'boards'),
+    os.path.join(HPM_SDK_BASE, 'arch'),
+    os.path.join(HPM_SDK_BASE, 'arch', 'riscv', 'intc'),
+    os.path.join(HPM_SDK_BASE, 'arch', 'riscv', 'l1c'),
+    os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY),
+]
+# For HPM6E00 specific paths
+if rtconfig.SOC_FAMILY == 'HPM6E00':
+    SDK_INC_PATHS += [
+        os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME),
+        os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'boot'),
+        os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, 'common'),
+    ]
+
+env.Append(CPPPATH = SDK_INC_PATHS)
+env.Append(CPPDEFINES = [rtconfig.CHIP_NAME, rtconfig.SOC_FAMILY, 'HPMSOC_HAS_HPMSDK_DMAV2'])
+# --- HPM SDK Source Files ---
+SDK_SRC = []
+# 1. Common Drivers
+SDK_SRC += [
+    os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_gpio_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_uart_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_dmav2_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_pmp_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_pcfg_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_pllctlv2_drv.c'),
+]
+# 2. SOC Specific (Clock, Sysctl, etc.)
+SDK_SRC += [
+    os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'hpm_clock_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'hpm_sysctl_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'system.c'),
+]
+# 3. Components & Utils
+SDK_SRC += [
+    os.path.join(HPM_SDK_BASE, 'components', 'debug_console', 'hpm_debug_console.c'),
+    os.path.join(HPM_SDK_BASE, 'components', 'dma_mgr', 'hpm_dma_mgr.c'),
+]
+# 4. Arch & Boot
+SDK_SRC += [
+    os.path.join(HPM_SDK_BASE, 'arch', 'riscv', 'l1c', 'hpm_l1c_drv.c'),
+    os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'boot', 'hpm_bootheader.c'),
+]
+
+# Add these to objs
+objs.extend(env.Object(SDK_SRC))
+# ----------------------------
+
+# Force include hpm_soc.h to resolve missing definitions in some drivers
+env.Append(CCFLAGS = ' -include hpm_soc.h ')
+# ------------------------
+
+# make a building
+DoBuilding(TARGET, objs)

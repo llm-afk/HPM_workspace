@@ -31,13 +31,5 @@ void thread_entry(void *arg)
         rt_thread_mdelay(500);
         app_led_write(0, APP_LED_OFF);
         rt_thread_mdelay(500);
-        app_led_write(1, APP_LED_ON);
-        rt_thread_mdelay(500);
-        app_led_write(1, APP_LED_OFF);
-        rt_thread_mdelay(500);
-        app_led_write(2, APP_LED_ON);
-        rt_thread_mdelay(500);
-        app_led_write(2, APP_LED_OFF);
-        rt_thread_mdelay(500);
     }
 }

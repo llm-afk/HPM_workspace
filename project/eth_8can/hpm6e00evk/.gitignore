@@ -1,0 +1,20 @@
+# Build artifacts
+build/
+*.o
+*.elf
+*.bin
+*.map
+*.hex
+*.sconsign.dblite
+.sconsign.dblite
+
+# IDE/Editor files
+.vscode/
+.settings/
+.project
+.cproject
+*.bak
+*.orig
+
+# SDK temporary files
+*.tmp

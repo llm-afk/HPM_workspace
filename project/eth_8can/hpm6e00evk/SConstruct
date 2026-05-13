@@ -39,25 +39,35 @@ env['ASCOM'] = env['ASPPCOM']
 Export('RTT_ROOT')
 Export('rtconfig')
 
+# --- Path Definitions ---
 SDK_ROOT = os.path.abspath('./')
+# HPM SDK Base (from rtconfig or environment)
+HPM_SDK_BASE = rtconfig.HPM_SDK_BASE
+# RT-Thread HPM Libraries (BSP local drivers)
 libraries_path_prefix = os.path.join(os.path.dirname(os.path.dirname(SDK_ROOT)), 'hpm_libraries', 'libraries')
 
 SDK_LIB = libraries_path_prefix
 Export('SDK_LIB')
-
+Export('HPM_SDK_BASE')
 
 GDB = rtconfig.GDB
 
-# prepare building environment
+# --- 1. Prepare building environment ---
 objs = PrepareBuilding(env, RTT_ROOT, has_libcpu=False)
 
+# --- 2. Setup VariantDirs for External Code ---
+# This prevents .o files from polluting the SDK/Library source directories
+SDK_BUILD_DIR = 'build/hpm_sdk'
+LIB_BUILD_DIR = 'build/hpm_libraries'
 
+env.VariantDir(SDK_BUILD_DIR, HPM_SDK_BASE, duplicate=0)
+env.VariantDir(LIB_BUILD_DIR, libraries_path_prefix, duplicate=0)
 
-# includes rtt drivers
-objs.extend(SConscript(os.path.join(libraries_path_prefix, 'drivers',  'SConscript')))
+# --- 3. Handle RT-Thread Drivers (from hpm_libraries) ---
+# We call SConscript within the variant directory context
+objs.extend(SConscript(os.path.join(LIB_BUILD_DIR, 'drivers', 'SConscript')))
 
-# --- HPM SDK Includes ---
-HPM_SDK_BASE = rtconfig.HPM_SDK_BASE
+# --- 4. HPM SDK Includes & Defines ---
 SDK_INC_PATHS = [
     os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, 'inc'),
     os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, 'ip'),
@@ -72,7 +82,6 @@ SDK_INC_PATHS = [
     os.path.join(HPM_SDK_BASE, 'arch', 'riscv', 'l1c'),
     os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY),
 ]
-# For HPM6E00 specific paths
 if rtconfig.SOC_FAMILY == 'HPM6E00':
     SDK_INC_PATHS += [
         os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME),
@@ -82,7 +91,8 @@ if rtconfig.SOC_FAMILY == 'HPM6E00':
 
 env.Append(CPPPATH = SDK_INC_PATHS)
 env.Append(CPPDEFINES = [rtconfig.CHIP_NAME, rtconfig.SOC_FAMILY, 'HPMSOC_HAS_HPMSDK_DMAV2'])
-# --- HPM SDK Source Files ---
+
+# --- 5. HPM SDK Source Files ---
 SDK_SRC = []
 # 1. Common Drivers
 SDK_SRC += [
@@ -93,7 +103,7 @@ SDK_SRC += [
     os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_pcfg_drv.c'),
     os.path.join(HPM_SDK_BASE, 'drivers', 'src', 'hpm_pllctlv2_drv.c'),
 ]
-# 2. SOC Specific (Clock, Sysctl, etc.)
+# 2. SOC Specific
 SDK_SRC += [
     os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'hpm_clock_drv.c'),
     os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'hpm_sysctl_drv.c'),
@@ -110,13 +120,13 @@ SDK_SRC += [
     os.path.join(HPM_SDK_BASE, 'soc', rtconfig.SOC_FAMILY, rtconfig.CHIP_NAME, 'boot', 'hpm_bootheader.c'),
 ]
 
-# Add these to objs
-objs.extend(env.Object(SDK_SRC))
-# ----------------------------
+# --- 6. Compile SDK Source in Variant Directory ---
+SDK_SRC_IN_BUILD = [os.path.join(SDK_BUILD_DIR, os.path.relpath(f, HPM_SDK_BASE)) for f in SDK_SRC]
+objs.extend(env.Object(SDK_SRC_IN_BUILD))
 
-# Force include hpm_soc.h to resolve missing definitions in some drivers
+# --- 7. Final Flags & Building ---
+# Force include hpm_soc.h to resolve missing definitions
 env.Append(CCFLAGS = ' -include hpm_soc.h ')
-# ------------------------
 
-# make a building
+# Perform the build
 DoBuilding(TARGET, objs)

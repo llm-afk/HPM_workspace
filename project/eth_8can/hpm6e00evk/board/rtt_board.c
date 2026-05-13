@@ -16,16 +16,18 @@
 #include <rthw.h>
 #include <rtthread.h>
 #include "hpm_dma_mgr.h"
-#include "hpm_mchtmr_drv.h"
 
 extern int rt_hw_uart_init(void);
 void os_tick_config(void);
 void rtt_board_init(void);
 
+extern uint32_t __heap_start__;
+extern uint32_t __heap_end__;
+
 void rt_hw_board_init(void)
 {
-    /* Initialize heap early for components that need rt_malloc (like dma_mgr) */
-    rt_system_heap_init((void *)0x01240000, (void *)0x01260000);
+    /* Initialize heap using linker symbols for robustness */
+    rt_system_heap_init((void *)&__heap_start__, (void *)&__heap_end__);
 
     rtt_board_init();
 
@@ -52,61 +54,32 @@ void rtt_board_init(void)
     /* Configure the OS Tick */
     os_tick_config();
 
-    /* Initialize the UART driver first, because later driver initialization may require the rt_kprintf */
+    /* Initialize the UART driver */
     rt_hw_uart_init();
 
     /* Set console device */
     rt_console_set_device(RT_CONSOLE_DEVICE_NAME);
 }
 
-void app_init_led_pins(void)
-{
-    board_init_led_pins();
-    gpio_set_pin_output(APP_LED0_GPIO_CTRL, APP_LED0_GPIO_INDEX, APP_LED0_GPIO_PIN);
-    gpio_set_pin_output(APP_LED1_GPIO_CTRL, APP_LED1_GPIO_INDEX, APP_LED1_GPIO_PIN);
-    gpio_set_pin_output(APP_LED2_GPIO_CTRL, APP_LED2_GPIO_INDEX, APP_LED2_GPIO_PIN);
-
-    gpio_write_pin(APP_LED0_GPIO_CTRL, APP_LED0_GPIO_INDEX, APP_LED0_GPIO_PIN, APP_LED_OFF);
-    gpio_write_pin(APP_LED1_GPIO_CTRL, APP_LED1_GPIO_INDEX, APP_LED1_GPIO_PIN, APP_LED_OFF);
-    gpio_write_pin(APP_LED2_GPIO_CTRL, APP_LED2_GPIO_INDEX, APP_LED2_GPIO_PIN, APP_LED_OFF);
-}
-
-void app_led_write(uint32_t index, bool state)
-{
-    switch (index)
-    {
-    case 0:
-        gpio_write_pin(APP_LED0_GPIO_CTRL, APP_LED0_GPIO_INDEX, APP_LED0_GPIO_PIN, state);
-        break;
-    case 1:
-        gpio_write_pin(APP_LED1_GPIO_CTRL, APP_LED1_GPIO_INDEX, APP_LED1_GPIO_PIN, state);
-        break;
-    case 2:
-        gpio_write_pin(APP_LED2_GPIO_CTRL, APP_LED2_GPIO_INDEX, APP_LED2_GPIO_PIN, state);
-        break;
-    default:
-        /* Suppress the toolchain warnings */
-        break;
-    }
-}
-
 void rt_hw_console_output(const char *str)
 {
     while (*str != '\0')
     {
+        /* Wait for TX slot avail */
+        while (!(uart_get_status(BOARD_APP_UART_BASE) & uart_stat_tx_slot_avail));
+
+        if (*str == '\n')
+        {
+            uart_send_byte(BOARD_APP_UART_BASE, '\r');
+            while (!(uart_get_status(BOARD_APP_UART_BASE) & uart_stat_tx_slot_avail));
+        }
         uart_send_byte(BOARD_APP_UART_BASE, *str++);
     }
-}
-
-void app_init_usb_pins(void)
-{
-    board_init_usb(HPM_USB0);
 }
 
 ATTR_PLACE_AT(".isr_vector") void mchtmr_isr(void)
 {
     HPM_MCHTMR->MTIMECMP = HPM_MCHTMR->MTIME + BOARD_MCHTMR_FREQ_IN_HZ / RT_TICK_PER_SECOND;
-
     rt_tick_increase();
 }
 
@@ -114,100 +87,6 @@ void rt_hw_cpu_reset(void)
 {
     HPM_PPOR->RESET_ENABLE |= (1UL << 31);
     HPM_PPOR->SOFTWARE_RESET = 1000U;
-    while(1) {
-
-    }
+    while(1);
 }
-
 MSH_CMD_EXPORT_ALIAS(rt_hw_cpu_reset, reset, reset the board);
-
-#ifdef RT_USING_CACHE
-void rt_hw_cpu_dcache_ops(int ops, void *addr, int size)
-{
-    if (ops == RT_HW_CACHE_FLUSH) {
-        l1c_dc_flush((uint32_t)addr, size);
-    } else {
-        l1c_dc_invalidate((uint32_t)addr, size);
-    }
-}
-#endif
-
-uint32_t rtt_board_init_adc16_clock(void *ptr, bool clk_src_ahb)  /* motor system should be use clk_adc_src_ahb0 */
-{
-    uint32_t freq = 0;
-
-    if (ptr == (void *)HPM_ADC0) {
-        clock_add_to_group(clock_adc0, 0);
-        if (clk_src_ahb) {
-            /* Configure the ADC clock from AHB (@200MHz by default)*/
-            clock_set_adc_source(clock_adc0, clk_adc_src_ahb0);
-        } else {
-            /* Configure the ADC clock from ANA (@200MHz by default)*/
-            clock_set_adc_source(clock_adc0, clk_adc_src_ana0);
-            clock_set_source_divider(clock_ana0, clk_src_pll1_clk0, 4U);
-        }
-        clock_add_to_group(clock_adc0, 0);
-        freq = clock_get_frequency(clock_adc0);
-    } else if (ptr == (void *)HPM_ADC1) {
-        if (clk_src_ahb) {
-            /* Configure the ADC clock from AHB (@200MHz by default)*/
-            clock_set_adc_source(clock_adc1, clk_adc_src_ahb0);
-        } else {
-            /* Configure the ADC clock from ANA (@200MHz by default)*/
-            clock_set_adc_source(clock_adc1, clk_adc_src_ana1);
-            clock_set_source_divider(clock_ana0, clk_src_pll1_clk0, 4U);
-        }
-        clock_add_to_group(clock_adc1, 0);
-        freq = clock_get_frequency(clock_adc1);
-    } else if (ptr == (void *)HPM_ADC2) {
-        if (clk_src_ahb) {
-            /* Configure the ADC clock from AHB (@200MHz by default)*/
-            clock_set_adc_source(clock_adc2, clk_adc_src_ahb0);
-        } else {
-            /* Configure the ADC clock from ANA (@200MHz by default)*/
-            clock_set_adc_source(clock_adc2, clk_adc_src_ana2);
-            clock_set_source_divider(clock_ana0, clk_src_pll1_clk0, 4U);
-        }
-        clock_add_to_group(clock_adc2, 0);
-        freq = clock_get_frequency(clock_adc2);
-    } else if (ptr == (void *)HPM_ADC3) {
-        if (clk_src_ahb) {
-            /* Configure the ADC clock from AHB (@200MHz by default)*/
-            clock_set_adc_source(clock_adc3, clk_adc_src_ahb0);
-        } else {
-            /* Configure the ADC clock from ANA (@200MHz by default)*/
-            clock_set_adc_source(clock_adc3, clk_adc_src_ana3);
-            clock_set_source_divider(clock_ana0, clk_src_pll1_clk0, 4U);
-        }
-        clock_add_to_group(clock_adc3, 0);
-        freq = clock_get_frequency(clock_adc3);
-    }
-
-    return freq;
-}
-
-uint32_t rtt_board_init_pwm_clock(PWMV2_Type *ptr)
-{
-    uint32_t freq = 0;
-    if (ptr == HPM_PWM0) {
-        clock_add_to_group(clock_pwm0, 0);
-        freq = clock_get_frequency(clock_pwm0);
-    } else if (ptr == HPM_PWM1) {
-        clock_add_to_group(clock_pwm1, 0);
-        freq = clock_get_frequency(clock_pwm1);
-    } else if (ptr == HPM_PWM2) {
-        clock_add_to_group(clock_pwm2, 0);
-        freq = clock_get_frequency(clock_pwm2);
-    } else if (ptr == HPM_PWM3) {
-        clock_add_to_group(clock_pwm3, 0);
-        freq = clock_get_frequency(clock_pwm3);
-    } else {
-
-    }
-    return freq;
-}
-
-#ifdef CONFIG_CHERRYUSB_CUSTOM_IRQ_HANDLER
-extern void hpm_isr_usb0(void);
-RTT_DECLARE_EXT_ISR_M(IRQn_USB0, hpm_isr_usb0)
-#endif

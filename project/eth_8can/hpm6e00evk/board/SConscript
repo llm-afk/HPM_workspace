@@ -2,13 +2,11 @@ from building import *
 
 cwd = GetCurrentDir()
 
-# add the general drivers
+# Only compile essential board support files
 src = Split("""
     board.c
     rtt_board.c
     pinmux.c
-    fal_flash_port.c
-    hpm_wm8960.c
 """)
 
 CPPPATH = [cwd]

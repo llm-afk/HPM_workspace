@@ -18,3 +18,9 @@ build/
 
 # SDK temporary files
 *.tmp
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

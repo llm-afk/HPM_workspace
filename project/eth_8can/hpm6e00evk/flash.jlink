@@ -1,0 +1,8 @@
+si 0
+speed 4000
+device HPM6E80XGNX
+halt
+loadbin rtthread.bin 0x80000400
+r
+go
+exit

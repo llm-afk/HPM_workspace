@@ -77,6 +77,26 @@ void rt_hw_console_output(const char *str)
     }
 }
 
+void app_init_led_pins(void)
+{
+    board_init_led_pins();
+}
+
+void app_led_write(uint32_t index, bool state)
+{
+    switch (index)
+    {
+    case 0:
+        gpio_write_pin(BOARD_R_GPIO_CTRL, BOARD_R_GPIO_INDEX, BOARD_R_GPIO_PIN, state);
+        break;
+    case 1:
+        gpio_write_pin(BOARD_G_GPIO_CTRL, BOARD_G_GPIO_INDEX, BOARD_G_GPIO_PIN, state);
+        break;
+    default:
+        break;
+    }
+}
+
 ATTR_PLACE_AT(".isr_vector") void mchtmr_isr(void)
 {
     HPM_MCHTMR->MTIMECMP = HPM_MCHTMR->MTIME + BOARD_MCHTMR_FREQ_IN_HZ / RT_TICK_PER_SECOND;

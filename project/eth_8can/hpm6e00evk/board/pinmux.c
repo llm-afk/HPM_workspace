@@ -19,3 +19,9 @@ void init_uart_pins(UART_Type *ptr)
         HPM_PIOC->PAD[IOC_PAD_PY06].FUNC_CTL = PIOC_PY06_FUNC_CTL_SOC_PY_06;
     }
 }
+
+void init_led_pins_as_gpio(void)
+{
+    HPM_IOC->PAD[IOC_PAD_PD00].FUNC_CTL = IOC_PD00_FUNC_CTL_GPIO_D_00;
+    HPM_IOC->PAD[IOC_PAD_PD01].FUNC_CTL = IOC_PD01_FUNC_CTL_GPIO_D_01;
+}

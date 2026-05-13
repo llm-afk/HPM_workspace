@@ -26,6 +26,11 @@ extern "C" {
 #endif /* __cplusplus */
 
 /* Core functions kept for RT-Thread boot */
+void app_init_led_pins(void);
+void app_led_write(uint32_t index, bool state);
+
+#define APP_LED_ON  BOARD_LED_ON_LEVEL
+#define APP_LED_OFF BOARD_LED_OFF_LEVEL
 
 #if defined(__cplusplus)
 }

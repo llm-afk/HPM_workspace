@@ -28,6 +28,18 @@
 #define BOARD_CONSOLE_UART_BAUDRATE (115200UL)
 #define BOARD_APP_UART_BASE         BOARD_CONSOLE_UART_BASE
 
+/* LED section */
+#define BOARD_LED_ON_LEVEL            (0U)
+#define BOARD_LED_OFF_LEVEL           (1U)
+
+#define BOARD_R_GPIO_CTRL             HPM_GPIO0
+#define BOARD_R_GPIO_INDEX            GPIO_DI_GPIOD
+#define BOARD_R_GPIO_PIN              0
+
+#define BOARD_G_GPIO_CTRL             HPM_GPIO0
+#define BOARD_G_GPIO_INDEX            GPIO_DI_GPIOD
+#define BOARD_G_GPIO_PIN              1
+
 /* Console type */
 #define CONSOLE_TYPE_UART           0
 #define BOARD_CONSOLE_TYPE          CONSOLE_TYPE_UART
@@ -40,6 +52,7 @@ void board_init(void);
 void board_init_console(void);
 void board_init_pmp(void);
 void board_init_clock(void);
+void board_init_led_pins(void);
 uint32_t board_init_uart_clock(UART_Type *ptr);
 
 #if defined(__cplusplus)

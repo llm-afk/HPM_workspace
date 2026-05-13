@@ -96,3 +96,10 @@ uint32_t board_init_uart_clock(UART_Type *ptr)
     }
     return freq;
 }
+
+void board_init_led_pins(void)
+{
+    init_led_pins_as_gpio();
+    gpio_set_pin_output_with_initial(BOARD_R_GPIO_CTRL, BOARD_R_GPIO_INDEX, BOARD_R_GPIO_PIN, BOARD_LED_OFF_LEVEL);
+    gpio_set_pin_output_with_initial(BOARD_G_GPIO_CTRL, BOARD_G_GPIO_INDEX, BOARD_G_GPIO_PIN, BOARD_LED_OFF_LEVEL);
+}
